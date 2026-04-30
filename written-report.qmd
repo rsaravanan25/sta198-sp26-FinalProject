@@ -1,0 +1,131 @@
+---
+title: "Written Report"
+author: "Rithika Saravanan"
+date: "May 2, 2026"
+format: pdf
+execute: 
+  warning: false
+  message: false
+  echo: false
+editor: visual
+---
+
+```{r}
+#import datasets & libraries
+library(tidyverse)
+library(janitor)
+
+patient_risk_profiles <- read.csv("data/patient_risk_profiles.csv")
+
+#clean all variable names in DF to create unique identifiers
+df_clean <- patient_risk_profiles %>%
+  clean_names()
+
+#Check for missing values in raw data
+na_counts <- colSums(is.na(df_clean))
+na_counts[na_counts > 0]
+
+#Collapse all age columns to only 1 with midpoint formula
+df_final <- df_clean %>%
+  pivot_longer( #long format
+    cols = starts_with("age_group"), names_to = "age_range", 
+    values_to = "is_present"
+  ) %>%
+  #filter rows with patient in age group
+  filter(is_present == 1) %>%
+  #get high and low end of range ==> midpoint
+  mutate(
+    age_low = as.numeric(str_extract(age_range, "\\d+")),
+    age_high = as.numeric(str_extract(age_range, "\\d+$")),
+    age_numeric = (age_low + age_high) / 2
+  ) %>%
+  #remove all old columns
+  select(-age_range, -is_present, -age_low, -age_high)
+
+#collapse sex columns ==> sex (0 = Male, 1 = Female)
+df_final <- df_final %>%
+  mutate(sex = case_when(
+    sex_female == 1 ~ 1,
+    sex_male == 1 ~ 0
+  )) %>%
+  #remove old columns
+  select(-sex_female, -sex_male)
+
+#combine stroke columns
+df_final <- df_final %>%
+  mutate(any_stroke = ifelse(
+    hemorrhagic_stroke_in_an_inpatient_setting_in_prior_year == 1 | 
+    non_hemorrhagic_stroke_in_an_inpatient_setting_in_prior_year == 1, 
+    1, 0)) %>%
+  select(-hemorrhagic_stroke_in_an_inpatient_setting_in_prior_year,
+         -non_hemorrhagic_stroke_in_an_inpatient_setting_in_prior_year)
+
+#str(df_final)
+
+#shorten column names & filter df to only useful predictors
+df_an <- df_final %>%
+  rename(
+    dementia_risk = predicted_risk_of_dementia,
+    hypertension = hypertension_in_prior_year,
+    hyperlipidemia = hyperlipidemia_in_prior_year,
+    smoking = smoking_in_prior_year,
+    t2_diabetes = type_2_diabetes_mellitus_dm_with_no_type_1_or_secondary_dm_in_prior_year,
+  ) %>%
+  #filter only useful col
+  select(person_id, age_numeric, sex, dementia_risk, 
+         hypertension, hyperlipidemia, any_stroke, smoking, t2_diabetes)
+
+# Convert binary indicators to factors with labels
+df_an <- df_an %>%
+  mutate(
+    sex = factor(sex, levels = c(0, 1), labels = c("Male", "Female")),
+    hypertension = factor(hypertension, levels = c(0, 1), labels = c("No", "Yes")),
+    hyperlipidemia = factor(hyperlipidemia, levels = c(0, 1), labels = c("No", "Yes")),
+    any_stroke = factor(any_stroke, levels = c(0, 1), labels = c("No", "Yes")),
+    smoking = factor(smoking, levels = c(0, 1), labels = c("No", "Yes")),
+    t2_diabetes = factor(t2_diabetes, levels = c(0, 1), labels = c("No", "Yes"))
+  )
+```
+
+```{r}
+#Get summary statistics of all variables
+summary(df_an)
+```
+
+```{r}
+#EDA of response variable - dementia_risk
+ggplot(df_an, aes(x = dementia_risk)) +
+  geom_histogram(bins = 50) +
+  labs(title = "Distribution of Predicted 1-Year Dementia Risk",
+       x = "Predicted Risk Score (0-1)",
+       y = "Count")
+```
+
+```{r}
+#Univariate EDA of predictor variable - age
+ggplot(df_an, aes(x = age_numeric)) +
+  geom_histogram(binwidth = 5, color = "white") +
+  labs(title = "Distribution of Patient Ages",
+       x = "Ages (Midpoint of 5−year bracket)",
+       y = "Count")
+```
+
+```{r}
+#Bivariate EDA
+ggplot(df_an, aes(x = hypertension, y = dementia_risk, fill = hypertension)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_y_log10() +
+  scale_fill_manual(values = c("No" = "red", "Yes" = "green")) +
+  labs(title = "Hypertension History Association with Dementia Risk",
+       x = "Presence of Hypertension",
+       y = "Dementia Risk Score")
+```
+
+```{r}
+ggplot(df_an, aes(x = age_numeric, y = dementia_risk)) +
+  geom_point(alpha = 0.6, color = "darkblue") +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Correlation between Age and Dementia Risk",
+       x = "Age (Midpoint of 5-year bracket)",
+       y = "Dementia Risk Score")
+```
