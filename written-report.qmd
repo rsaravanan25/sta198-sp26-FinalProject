@@ -21,10 +21,6 @@ patient_risk_profiles <- read.csv("data/patient_risk_profiles.csv")
 df_clean <- patient_risk_profiles %>%
   clean_names()
 
-#Check for missing values in raw data
-na_counts <- colSums(is.na(df_clean))
-na_counts[na_counts > 0]
-
 #Collapse all age columns to only 1 with midpoint formula
 df_final <- df_clean %>%
   pivot_longer( #long format
@@ -95,7 +91,7 @@ summary(df_an)
 ```{r}
 #EDA of response variable - dementia_risk
 ggplot(df_an, aes(x = dementia_risk)) +
-  geom_histogram(bins = 50) +
+  geom_histogram(bins = 50, color = "white") +
   labs(title = "Distribution of Predicted 1-Year Dementia Risk",
        x = "Predicted Risk Score (0-1)",
        y = "Count")
@@ -128,4 +124,120 @@ ggplot(df_an, aes(x = age_numeric, y = dementia_risk)) +
   labs(title = "Correlation between Age and Dementia Risk",
        x = "Age (Midpoint of 5-year bracket)",
        y = "Dementia Risk Score")
+```
+
+```{r}
+#Model comparisons
+
+#Model 1: Demographics only
+m1 <- lm(dementia_risk ~ age_numeric + sex, data = df_an)
+
+# Model 2: Adding Vascular Indicators (The Core Hypothesis)
+m2 <- lm(dementia_risk ~ age_numeric + sex + hypertension + any_stroke + hyperlipidemia, data = df_an)
+
+# Model 3: The Full Predictive Model
+m3 <- lm(dementia_risk ~ age_numeric + sex + hypertension + any_stroke + hyperlipidemia + t2_diabetes + smoking, data = df_an)
+
+m4 <- lm(dementia_risk ~ sex + + any_stroke + hyperlipidemia + age_numeric * hypertension, data = df_an)
+
+m5<- lm(log(dementia_risk) ~ age_numeric + sex + hypertension + any_stroke + hyperlipidemia, data = df_an)
+
+# Check the results
+summary(m1)
+summary(m2)
+summary(m3)
+summary(m4)
+summary(m5)
+```
+
+\newpage
+
+# Evaluating Cardiovascular and Metabolic Predictors of 1 - Year Dementia Risk
+
+## Introduction
+
+Dementia is a growing public health concern in the 21st century, especially with the aging population. It is imperative that we understand the factors associated with dementia risk to help identify and assist high-risk individuals for early intervention. The modern "Vascular Hypothesis" suggests that cognitive decline and dementia are linked to systematic cardiovascular health. So this study aims to quantify how these vascular health predictors, like hypertension, hyperlipidemia, and history of smoking behavior, influence an individual's predicted 1-year risk of dementia.
+
+The data used in this analysis is from TidyTuesday Patient Risk Profiles dataset (October 2023), originally prepared for the R/Pharma conference and contributed by Jenna Reps. It consists of 100 simulated patient profiles generated from real-world healthcare data and logistic regression models. Each observation (row) represents a unique simulated patient (represented by personId), containing their medical history and predicted 1-year risk scores for 14 health outcomes. The observational unit is an individual (simulated) patient. Initial data cleaning and analysis found no missing NA values in the dataset (refer to Appendix Figure I). In addition, to ensure a reproducible and principled analysis, several cleaning steps were performed:
+
+-   **Standardization:** Non-standard raw column names were converted to snake_case using the `janitor` package.
+
+-   **Age Continuous Transformation:** 20 Age intervals (e.g., 70-74) variables were converted to a singular variable using the **midpoint formula** for each patient.
+
+-   **Feature Engineering:** Hemorrhagic and non-hemorrhagic stroke indicators were combined into a single "Any Stroke" variable to strengthen the clinical signal. Similarly, sex columns were combined to a single factor (Male/Female). Key variables were renamed for clarity and a new dataframe was created with the subset of binary indicated converted to labeled factors we focus on.
+
+**Research Question**: What patient characteristics (demographic and medical history factors) are most strongly associated with higher predicted 1-year dementia risk in this simulated cohort?
+
+The response variable of interest is predicted_risk_of_dementia (a probability between 0 and 1). Initial EDA analysis of Dementia Risk among the patients demonstrated a right-skew of the data, so majority of the patients are low-risk (refer to Figure 1 below). Predictors include age (collapsed from age group indicators), sex, and several binary comorbidity/smoking indicators such as hypertension, hyperlipidemia, any stroke (hemorrhagic or non-hemorrhagic), type 2 diabetes, and smoking history in the prior year. Moreover, Figure 2 confirms our sample spans across the average full adult lifecycle, with adult midpoints every 5 years, to provide a good baseline for testing age-dependent dementia risk.
+
+```{r}
+#EDA of response variable - dementia_risk
+ggplot(df_an, aes(x = dementia_risk)) +
+  geom_histogram(bins = 50, color = "white") +
+  labs(title = "Figure 1 - Distribution of Predicted 1-Year Dementia Risk",
+       x = "Predicted Risk Score (0-1)",
+       y = "Count")
+```
+
+```{r}
+#Univariate EDA of predictor variable - age
+ggplot(df_an, aes(x = age_numeric)) +
+  geom_histogram(binwidth = 5, color = "white") +
+  labs(title = "Figure 2 - Distribution of Patient Ages",
+       x = "Ages (Midpoint of 5−year bracket)",
+       y = "Count")
+```
+
+# Methodology
+
+Given that the response variable (predicted 1-year dementia risk) is a continuous numeric variable and our goal is to quantify the individual and combined contributions multiple clinical vascular variables play, Multiple Linear Regression was selected as the most appropriate approach. MLR allows for the isolation of specific, individual variable effects and the combined interactive effects, while also controlling for essential confounding variables (ex. age and sex). This method of analysis was chosen over others because the primary goal is to analyze the magnitude of dementia risk, rather than a simple binary "at risk/not at risk" categorization like with logistic regression.
+
+A nested modeling approach was used to create the most effective statistical model to predict dementia risk.
+
+-   Model 1 was the baseline demographic model that just used the patient's age and sex to predict dementia risk.
+
+-   Model 2 added the vascular predictors, so used a patient's age, sex, hypertension history, stroke history, and hyperlipidemia history to predict their dementia risk score.
+
+-   Model 3 was the full model that used a patient's age, sex, hypertension history, stroke history, hyperlipidemia history, type 2 diabetes history, and smoking history to predict their dementia risk score.
+
+-   Model 4 added an interaction term between age and hypertension history in addition to a patient's stroke history, hyperlipidemia history, and sex to predict one's dementia risk. This approach lets one see the incremental predictive gain and the complexity increases.
+
+-   Since the main response variable is also skewed towards 0 (refer to Figure 1), model 5 checks how well a patient's age, sex, hypertension history, stroke history, and hyperlipidemia history predict the log-transformed dementia_risk of a patient.
+
+Ultimately, the best model was seen to be model 5 (will be explained why in the Results section). In addition, all assumptions of linear regression were verified for the final chosen model (model 5). Refer to Appendix Figure II for more details on the analysis performed in R:
+
+-   **Linearity & Constant Variance:** The Residuals v. Fitted value plot showed a random scatter of points around 0 and a constant spread of residuals.
+
+-   **Independence**: Since each observation represented a unique simulated patient profile with no mentioning of clustering, we are safe to assume independence of outcomes.
+
+-   **Normality**: A Q-Q plot shows that the residuals follow closely along the reference line.
+
+## Results
+
+```{r}
+st(df_an, 
+   vars = c('age_numeric', 'sex', 'hypertension', 'hyperlipidemia', 
+            'any_stroke', 'smoking', 't2_diabetes', 'dementia_risk'),
+   labels = c('Age', 'Sex', 'Hypertension', 'Hyperlipidemia', 
+              'Stroke History', 'Smoking', 'Type 2 Diabetes', 'Dementia Risk'),
+   title = "Table 1: Descriptive Statistics of Simulated Patient Population (N=100)")
+```
+
+## 
+
+## Appendix
+
+### I. Initial Data Cleaning - Missing Value Check
+
+```{r}
+#Check for missing values in raw data
+na_counts <- colSums(is.na(df_clean))
+na_counts[na_counts > 0]
+```
+
+### II. Linear Regression Assumption Check
+
+```{r}
+plot(m5, which = 1)
+plot(m5, which = 2)
 ```
