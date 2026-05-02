@@ -1,5 +1,5 @@
 ---
-title: "Written Report"
+title: "Evaluating Cardiovascular and Metabolic Predictors of 1 - Year Dementia Risk"
 author: "Rithika Saravanan"
 date: "May 2, 2026"
 format: pdf
@@ -13,6 +13,8 @@ editor: visual
 ```{r}
 #import datasets & libraries
 library(tidyverse)
+library(tidymodels)
+library(knitr)
 library(janitor)
 
 patient_risk_profiles <- read.csv("data/patient_risk_profiles.csv")
@@ -81,53 +83,6 @@ df_an <- df_an %>%
     smoking = factor(smoking, levels = c(0, 1), labels = c("No", "Yes")),
     t2_diabetes = factor(t2_diabetes, levels = c(0, 1), labels = c("No", "Yes"))
   )
-```
-
-```{r}
-#Get summary statistics of all variables
-summary(df_an)
-```
-
-```{r}
-#EDA of response variable - dementia_risk
-ggplot(df_an, aes(x = dementia_risk)) +
-  geom_histogram(bins = 50, color = "white") +
-  labs(title = "Distribution of Predicted 1-Year Dementia Risk",
-       x = "Predicted Risk Score (0-1)",
-       y = "Count")
-```
-
-```{r}
-#Univariate EDA of predictor variable - age
-ggplot(df_an, aes(x = age_numeric)) +
-  geom_histogram(binwidth = 5, color = "white") +
-  labs(title = "Distribution of Patient Ages",
-       x = "Ages (Midpoint of 5−year bracket)",
-       y = "Count")
-```
-
-```{r}
-#Bivariate EDA
-ggplot(df_an, aes(x = hypertension, y = dementia_risk, fill = hypertension)) +
-  geom_boxplot(alpha = 0.7) +
-  scale_y_log10() +
-  scale_fill_manual(values = c("No" = "red", "Yes" = "green")) +
-  labs(title = "Hypertension History Association with Dementia Risk",
-       x = "Presence of Hypertension",
-       y = "Dementia Risk Score")
-```
-
-```{r}
-ggplot(df_an, aes(x = age_numeric, y = dementia_risk)) +
-  geom_point(alpha = 0.6, color = "darkblue") +
-  geom_smooth(method = "lm", se = TRUE) +
-  labs(title = "Correlation between Age and Dementia Risk",
-       x = "Age (Midpoint of 5-year bracket)",
-       y = "Dementia Risk Score")
-```
-
-```{r}
-#Model comparisons
 
 #Model 1: Demographics only
 m1 <- lm(dementia_risk ~ age_numeric + sex, data = df_an)
@@ -138,21 +93,23 @@ m2 <- lm(dementia_risk ~ age_numeric + sex + hypertension + any_stroke + hyperli
 # Model 3: The Full Predictive Model
 m3 <- lm(dementia_risk ~ age_numeric + sex + hypertension + any_stroke + hyperlipidemia + t2_diabetes + smoking, data = df_an)
 
+# Model 4: Vascular Indicators + Interaction
 m4 <- lm(dementia_risk ~ sex + + any_stroke + hyperlipidemia + age_numeric * hypertension, data = df_an)
 
+#Model 5: Vascular Indicators + Log-transformed(dementia_risk)
 m5<- lm(log(dementia_risk) ~ age_numeric + sex + hypertension + any_stroke + hyperlipidemia, data = df_an)
-
-# Check the results
-summary(m1)
-summary(m2)
-summary(m3)
-summary(m4)
-summary(m5)
 ```
 
-\newpage
-
-# Evaluating Cardiovascular and Metabolic Predictors of 1 - Year Dementia Risk
+```{r}
+#Bivariate EDA
+#ggplot(df_an, aes(x = hypertension, y = dementia_risk, fill = hypertension)) +
+#  geom_boxplot(alpha = 0.7) +
+#  scale_y_log10() +
+#  scale_fill_manual(values = c("No" = "red", "Yes" = "green")) +
+#  labs(title = "Hypertension History Association with Dementia Risk",
+#       x = "Presence of Hypertension",
+#       y = "Dementia Risk Score")
+```
 
 ## Introduction
 
@@ -202,7 +159,7 @@ A nested modeling approach was used to create the most effective statistical mod
 
 -   Model 4 added an interaction term between age and hypertension history in addition to a patient's stroke history, hyperlipidemia history, and sex to predict one's dementia risk. This approach lets one see the incremental predictive gain and the complexity increases.
 
--   Since the main response variable is also skewed towards 0 (refer to Figure 1), model 5 checks how well a patient's age, sex, hypertension history, stroke history, and hyperlipidemia history predict the log-transformed dementia_risk of a patient.
+-   Model 5 checks how well a patient's age, sex, hypertension history, stroke history, and hyperlipidemia history predict the log-transformed dementia_risk of a patient, since the main response variable is also skewed towards 0 (refer to Figure 1).
 
 Ultimately, the best model was seen to be model 5 (will be explained why in the Results section). In addition, all assumptions of linear regression were verified for the final chosen model (model 5). Refer to Appendix Figure II for more details on the analysis performed in R:
 
@@ -214,16 +171,41 @@ Ultimately, the best model was seen to be model 5 (will be explained why in the 
 
 ## Results
 
+Summary statistics of the dataset revealed that around 16% of patients have a history with hypertension, 14% show hyperlipidemia, and 27% have experienced some type of stroke. Moreover, the mean age of the patients was 46.8 years (refer to Appendix Figure III). This gives context for the different models compared in this study.
+
 ```{r}
-st(df_an, 
-   vars = c('age_numeric', 'sex', 'hypertension', 'hyperlipidemia', 
-            'any_stroke', 'smoking', 't2_diabetes', 'dementia_risk'),
-   labels = c('Age', 'Sex', 'Hypertension', 'Hyperlipidemia', 
-              'Stroke History', 'Smoking', 'Type 2 Diabetes', 'Dementia Risk'),
-   title = "Table 1: Descriptive Statistics of Simulated Patient Population (N=100)")
+cat("Figure 3:  Model Comparison Statistics")
+model_comp <- data.frame(
+  "Model" = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5"),
+  "R^2" = c(0.292, 0.418, 0.425, 0.421, 0.921),
+  "Adjusted R^2" = c(0.277,  0.388, 0.381, 0.384, 0.917),
+  "Residual Standard Error (RSE)" = c(0.061, 0.056, 0.057, 0.056, 0.765),
+  "F-Statistic" = c(19.99, 13.55, 9.71, 11.26, 219.40))
+kable(model_comp)
+
 ```
 
-## 
+Refer to Figure 3 above to see how the different models compare in predictive power. Among the baseline demographic model (model 1), vascular predictors model (model 2), and full model with smoking and type 2 diabetes history (model 3), model 1 had the lowest adjusted R\^2 value (0.277) and model 2 had the highest R\^2 value (0.388). To test if an interaction term between age and hypertension history would add significant predictive power, model 4 incorporated the vascular predictors and this interaction term. However, the adjusted R\^2 for model 4 was slightly lower than model 2 even though the R\^2 value for model 4 was higher than the R\^2 value for model 2. Thus, adding the added complexity of adding the interaction term between age and hypertension history did not significantly improve the predictive power of the model.
+
+Nevertheless, when checking if model 2 complied with the assumptions for linear regression, it was found that the Residuals vs. Fitted plot violates the linearity and constant variance conditions by "fanning out" and clustering more on the left side than the right (refer to Appendix Figure IV). This is likely due to the main response variable dementia_risk being skewed towards 0 (refer to Figure 1). By log-transforming the response variable in model 5, the variance was stabilized (refer to Appendix Figure II) and achieved an adjusted R-squared value of around 0.917, meaning that the clinical variables in the model explain around 92% of the variance in dementia risk.
+
+```{r}
+cat("Figure 4: Model 5 Statistics")
+tidy(m5) |>
+  kable(digits = 3)
+```
+
+In the final model (Model 5), a patient's age and whether they have had a stroke appear to be the most statistically significant clinical predictors (p \< 0.05) in predicting one's dementia_risk score. Because the model is log-transformed, the coefficients in Figure 4 represent the multiplicative change in one's dementia risk score. For example, when controlling for all other variables in the model, a history of stroke is associated with a statistically higher predicted dementia risk score for a patient compared to those without a stroke history, on average. Similarly, one's age increasing is associated with a steady increase in the log-risk of dementia, when controlling for all other variables in the model, on average. On the other hand, hypertension, hyperlipidemia, and sex are not statistically significant predictors of dementia risk, when controlling for all other variables in the model. The boxplot of dementia risk score versus Stroke history in Appendix figure V confirms the regression results, showing a clear upward shift in risk for the stroke-positive group. Similarly, the dot plot of a patient's age versus dementia risk score showed a clear upward trend of increasing dementia risk score as one's age increased (refer to Appendix Figure VI).
+
+## Discussion
+
+In conclusion, the results of this analysis provides supporting evidence for the "Vascular Hypothesis" initially discussed about one's cardiovascular health being a key factor one's likely to get dementia. In particular, this study identified age and history as the key factors associated with higher predicted 1-year dementia risk in the simulated cohort of participants. This makes sense since dementia is age-related condition. However, the baseline demographic model (Model 1) having the weakest predictive power of the models reveals that cogntive decline and dementia is not solely because of aging, but rather influenced by other conditions like one's history of stroke. Thus, this is indicative of cardiovascular intervention needing to be a primary preventative measure against dementia risk in aging patients.
+
+A limitation to keep in mind is the fact that this analysis was done on simulated data with a small sample size of N = 100. It may lack the real-world complexities and randomness that cannot always be simulated. Moreover, the small sample size also means that smaller effects from factors like diabetes may have not been detected easily. The outcome is also a "predicted risk" from prior models and not observed dementia prevalence in patients. So, the results and analysis should not be interpreted casually and generalizability to real-world populations is limited.
+
+In the future, it would be interesting to analyze a larger dataset and analyze how the dementia risk scores change across a decade (since this dataset only captures a 1-year snapshot of predicted risk). This approach would provide more realistic data that doctors and the general population can learn from and adapt to over time for early intervention.
+
+\newpage
 
 ## Appendix
 
@@ -235,9 +217,67 @@ na_counts <- colSums(is.na(df_clean))
 na_counts[na_counts > 0]
 ```
 
-### II. Linear Regression Assumption Check
+### II. Linear Regression Assumption Check for Model 5
 
 ```{r}
 plot(m5, which = 1)
 plot(m5, which = 2)
+```
+
+### III. Summary Statistics of Dataset
+
+```{r}
+#Get summary statistics of all variables
+num <- df_an %>%
+  select(age_numeric, dementia_risk) %>%
+  summary()
+
+cat <- df_an %>%
+  select(sex, hypertension, hyperlipidemia, any_stroke, smoking, t2_diabetes) %>%
+  summary()
+
+cat("**Numeric Variables**\n")
+kable(num, digits = 4, caption = "Numeric Variable Summary")
+
+cat("Categorical Variables**\n")
+kable(cat, caption = "Categorical Variable Summary")
+```
+
+### IV. Linear Regression Assumption Check for Model 2
+
+```{r}
+plot(m2, which = 1)
+plot(m2, which = 2)
+```
+
+### V. Boxplot of Stroke History Association with Dementia Risk Score
+
+```{r}
+ggplot(df_an, aes(x = any_stroke, y = dementia_risk)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_y_log10() +
+  labs(title = "Stroke History Association with Dementia Risk",
+       x = "Presence of Stroke History",
+       y = "Dementia Risk Score (log)")
+```
+
+### VI. Patient's Age Association with Dementia Risk Score
+
+```{r}
+ggplot(df_an, aes(x = age_numeric, y = dementia_risk)) +
+  geom_point(alpha = 0.6, color = "darkblue") +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(title = "Correlation between Age and Dementia Risk",
+       x = "Age (Midpoint of 5-year bracket)",
+       y = "Dementia Risk Score")
+```
+
+### VII. Model Comparison
+
+```{r}
+summary(m1)
+summary(m2)
+summary(m3)
+summary(m4)
+summary(m5)
 ```
