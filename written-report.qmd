@@ -100,22 +100,11 @@ m4 <- lm(dementia_risk ~ sex + + any_stroke + hyperlipidemia + age_numeric * hyp
 m5<- lm(log(dementia_risk) ~ age_numeric + sex + hypertension + any_stroke + hyperlipidemia, data = df_an)
 ```
 
-```{r}
-#Bivariate EDA
-#ggplot(df_an, aes(x = hypertension, y = dementia_risk, fill = hypertension)) +
-#  geom_boxplot(alpha = 0.7) +
-#  scale_y_log10() +
-#  scale_fill_manual(values = c("No" = "red", "Yes" = "green")) +
-#  labs(title = "Hypertension History Association with Dementia Risk",
-#       x = "Presence of Hypertension",
-#       y = "Dementia Risk Score")
-```
-
 ## Introduction
 
 Dementia is a growing public health concern in the 21st century, especially with the aging population. It is imperative that we understand the factors associated with dementia risk to help identify and assist high-risk individuals for early intervention. The modern "Vascular Hypothesis" suggests that cognitive decline and dementia are linked to systematic cardiovascular health. So this study aims to quantify how these vascular health predictors, like hypertension, hyperlipidemia, and history of smoking behavior, influence an individual's predicted 1-year risk of dementia.
 
-The data used in this analysis is from TidyTuesday Patient Risk Profiles dataset (October 2023), originally prepared for the R/Pharma conference and contributed by Jenna Reps. It consists of 100 simulated patient profiles generated from real-world healthcare data and logistic regression models. Each observation (row) represents a unique simulated patient (represented by personId), containing their medical history and predicted 1-year risk scores for 14 health outcomes. The observational unit is an individual (simulated) patient. Initial data cleaning and analysis found no missing NA values in the dataset (refer to Appendix Figure I). In addition, to ensure a reproducible and principled analysis, several cleaning steps were performed:
+The data used in this analysis is from TidyTuesday Patient Risk Profiles dataset (October 2023), originally prepared for the R/Pharma conference and contributed by Jenna Reps. The link to the dataset is: <https://github.com/rfordatascience/tidytuesday/blob/main/data/2023/2023-10-24/readme.md>. It consists of 100 simulated patient profiles generated from real-world healthcare data and logistic regression models. Each observation (row) represents a unique simulated patient (represented by personId), containing their medical history and predicted 1-year risk scores for 14 health outcomes. The observational unit is an individual (simulated) patient. Initial data cleaning and analysis found no missing NA values in the dataset (refer to Appendix Figure I). In addition, to ensure a reproducible and principled analysis, several cleaning steps were performed:
 
 -   **Standardization:** Non-standard raw column names were converted to snake_case using the `janitor` package.
 
@@ -195,7 +184,7 @@ tidy(m5) |>
   kable(digits = 3)
 ```
 
-In the final model (Model 5), a patient's age and whether they have had a stroke appear to be the most statistically significant clinical predictors (p \< 0.05) in predicting one's dementia_risk score. Because the model is log-transformed, the coefficients in Figure 4 represent the multiplicative change in one's dementia risk score. For example, when controlling for all other variables in the model, a history of stroke is associated with a statistically higher predicted dementia risk score for a patient compared to those without a stroke history, on average. Similarly, one's age increasing is associated with a steady increase in the log-risk of dementia, when controlling for all other variables in the model, on average. On the other hand, hypertension, hyperlipidemia, and sex are not statistically significant predictors of dementia risk, when controlling for all other variables in the model. The boxplot of dementia risk score versus Stroke history in Appendix figure V confirms the regression results, showing a clear upward shift in risk for the stroke-positive group. Similarly, the dot plot of a patient's age versus dementia risk score showed a clear upward trend of increasing dementia risk score as one's age increased (refer to Appendix Figure VI).
+The final model is: $log(dementia \ risk) = \beta_0 + \beta_1(Age) + \beta_2(sex) + \beta_3(hypertension) + \beta_4(stroke) + \beta_5(hyperlipidemia) + \epsilon$In the final model (Model 5), a patient's age and whether they have had a stroke appear to be the most statistically significant clinical predictors (p \< 0.05) in predicting one's dementia_risk score. Because the model is log-transformed, the coefficients in Figure 4 represent the multiplicative change in one's dementia risk score. For example, when controlling for all other variables in the model, a history of stroke is associated with a statistically higher predicted dementia risk score for a patient compared to those without a stroke history, on average. Similarly, one's age increasing is associated with a steady increase in the log-risk of dementia, when controlling for all other variables in the model, on average. On the other hand, hypertension, hyperlipidemia, and sex are not statistically significant predictors of dementia risk, when controlling for all other variables in the model. The boxplot of dementia risk score versus Stroke history in Appendix figure V confirms the regression results, showing a clear upward shift in risk for the stroke-positive group. Similarly, the dot plot of a patient's age versus dementia risk score showed a clear upward trend of increasing dementia risk score as one's age increased (refer to Appendix Figure VI).
 
 ## Discussion
 
@@ -275,9 +264,14 @@ ggplot(df_an, aes(x = age_numeric, y = dementia_risk)) +
 ### VII. Model Comparison
 
 ```{r}
+cat("Model 1")
 summary(m1)
+cat("Model 2")
 summary(m2)
+cat("Model 3")
 summary(m3)
+cat("Model 4")
 summary(m4)
+cat("Model 5")
 summary(m5)
 ```
